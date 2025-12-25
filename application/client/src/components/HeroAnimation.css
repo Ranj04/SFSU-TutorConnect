@@ -1,0 +1,299 @@
+/**
+ * HeroAnimation.css
+ * -----------------
+ * Styles for the animated hero section on the landing page. Includes the
+ * aurora gradient, floating particles, academic icons, and wave animations.
+ *
+ * Contributors: Ranjiv Jithendran, Team 02
+ */
+
+.hero-animation-container {
+  position: relative;
+  width: 100%;
+  height: 280px;
+  overflow: hidden;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(65, 21, 69, 0.03) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+/* Aurora gradient background */
+.aurora-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  filter: blur(60px);
+  opacity: 0.5;
+}
+
+.aurora-gradient {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(40px);
+}
+
+.aurora-1 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(65, 21, 69, 0.4) 0%, transparent 70%);
+  top: -100px;
+  left: 10%;
+  animation: aurora-float-1 8s ease-in-out infinite;
+}
+
+.aurora-2 {
+  width: 350px;
+  height: 350px;
+  background: radial-gradient(circle, rgba(200, 155, 60, 0.3) 0%, transparent 70%);
+  top: 50px;
+  right: 15%;
+  animation: aurora-float-2 10s ease-in-out infinite;
+}
+
+.aurora-3 {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(65, 21, 69, 0.3) 0%, transparent 70%);
+  bottom: -50px;
+  left: 40%;
+  animation: aurora-float-3 7s ease-in-out infinite;
+}
+
+@keyframes aurora-float-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, 20px) scale(1.1); }
+  66% { transform: translate(-20px, 10px) scale(0.95); }
+}
+
+@keyframes aurora-float-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-40px, 30px) scale(1.15); }
+}
+
+@keyframes aurora-float-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(20px, -20px) scale(1.05); }
+  75% { transform: translate(-30px, 10px) scale(1.1); }
+}
+
+/* Floating particles */
+.particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: rgba(200, 155, 60, 0.6);
+  border-radius: 50%;
+  bottom: -10px;
+  animation: particle-rise linear infinite;
+}
+
+.particle:nth-child(odd) {
+  background: rgba(65, 21, 69, 0.5);
+  width: 3px;
+  height: 3px;
+}
+
+.particle:nth-child(3n) {
+  background: rgba(255, 255, 255, 0.8);
+  width: 2px;
+  height: 2px;
+  box-shadow: 0 0 6px rgba(200, 155, 60, 0.8);
+}
+
+@keyframes particle-rise {
+  0% {
+    transform: translateY(0) translateX(0) scale(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  90% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-300px) translateX(20px) scale(0.5);
+    opacity: 0;
+  }
+}
+
+/* Floating icons */
+.floating-icons {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.floating-icon {
+  position: absolute;
+  bottom: 0;
+  color: rgba(65, 21, 69, 0.25);
+  filter: drop-shadow(0 2px 8px rgba(65, 21, 69, 0.1));
+}
+
+.floating-icon:nth-child(even) {
+  color: rgba(200, 155, 60, 0.3);
+}
+
+.icon-svg {
+  transition: transform 0.3s ease;
+}
+
+/* Animated waves */
+.waves-svg {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 80px;
+}
+
+.wave {
+  opacity: 0.6;
+}
+
+.wave-1 {
+  animation: wave-move-1 12s ease-in-out infinite;
+}
+
+.wave-2 {
+  animation: wave-move-2 10s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+@keyframes wave-move-1 {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-50px); }
+}
+
+@keyframes wave-move-2 {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(50px); }
+}
+
+/* Center content */
+.animation-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.center-orb {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    rgba(65, 21, 69, 0.15) 0%,
+    rgba(200, 155, 60, 0.1) 50%,
+    rgba(65, 21, 69, 0.15) 100%
+  );
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(65, 21, 69, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 
+    0 8px 32px rgba(65, 21, 69, 0.15),
+    inset 0 0 20px rgba(255, 255, 255, 0.1);
+}
+
+.orb-inner {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(255, 255, 255, 0.7) 100%
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(65, 21, 69, 0.1);
+}
+
+.orb-text {
+  font-size: 2.5rem;
+  animation: orb-pulse 3s ease-in-out infinite;
+}
+
+@keyframes orb-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.animation-tagline {
+  margin-top: 1.5rem;
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--sfsu-purple, #411545);
+  opacity: 0.8;
+  letter-spacing: 0.02em;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .hero-animation-container {
+    height: 200px;
+  }
+
+  .center-orb {
+    width: 90px;
+    height: 90px;
+  }
+
+  .orb-inner {
+    width: 60px;
+    height: 60px;
+  }
+
+  .orb-text {
+    font-size: 1.8rem;
+  }
+
+  .animation-tagline {
+    font-size: 0.95rem;
+    padding: 0 1rem;
+    text-align: center;
+  }
+
+  .aurora-1, .aurora-2, .aurora-3 {
+    transform: scale(0.7);
+  }
+
+  .floating-icon {
+    display: none;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .aurora-gradient,
+  .particle,
+  .floating-icon,
+  .wave,
+  .orb-text,
+  .center-orb {
+    animation: none !important;
+  }
+
+  .hero-animation-container {
+    height: 150px;
+  }
+}
+

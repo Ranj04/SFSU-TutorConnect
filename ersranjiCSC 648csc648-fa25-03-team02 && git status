@@ -1,0 +1,44 @@
+[1mdiff --git a/application/backend/db/migrations/013_performance_indexes.sql b/application/backend/db/migrations/013_performance_indexes.sql[m
+[1mindex dcfa583..9702589 100644[m
+[1m--- a/application/backend/db/migrations/013_performance_indexes.sql[m
+[1m+++ b/application/backend/db/migrations/013_performance_indexes.sql[m
+[36m@@ -12,32 +12,33 @@[m
+ [m
+ -- Index for filtering tutors by verification status[m
+ -- Used in: search queries, admin dashboard[m
+[31m-CREATE INDEX IF NOT EXISTS idx_tutor_profiles_verification [m
+[32m+[m[32m-- Note: IF NOT EXISTS removed for MySQL compatibility - errors are handled gracefully by migration script[m
+[32m+[m[32mCREATE INDEX idx_tutor_profiles_verification[m[41m [m
+ ON tutor_profiles(verification_status);[m
+ [m
+ -- Index for message inbox queries (recipient + read status + date)[m
+ -- Used in: user inbox, unread message counts[m
+[31m-CREATE INDEX IF NOT EXISTS idx_messages_inbox [m
+[32m+[m[32mCREATE INDEX idx_messages_inbox[m[41m [m
+ ON messages(recipient_user_id, is_read, sent_at);[m
+ [m
+ -- Index for tutor subject mappings (for category filtering)[m
+ -- Used in: subject-based tutor searches[m
+[31m-CREATE INDEX IF NOT EXISTS idx_tutor_subjects_lookup [m
+[32m+[m[32mCREATE INDEX idx_tutor_subjects_lookup[m[41m [m
+ ON tutor_subjects(subject_id, tutor_profile_id);[m
+ [m
+ -- Index for tutor course mappings (for course-based searches)[m
+ -- Used in: course-specific tutor searches[m
+[31m-CREATE INDEX IF NOT EXISTS idx_tutor_courses_lookup [m
+[32m+[m[32mCREATE INDEX idx_tutor_courses_lookup[m[41m [m
+ ON tutor_courses(course_id, tutor_profile_id);[m
+ [m
+ -- Index for user account status (for filtering active users)[m
+ -- Used in: login, user listings[m
+[31m-CREATE INDEX IF NOT EXISTS idx_users_account_status [m
+[32m+[m[32mCREATE INDEX idx_users_account_status[m[41m [m
+ ON users(account_status);[m
+ [m
+ -- Composite index for efficient message threading[m
+ -- Used in: conversation threads, parent-child message relationships[m
+[31m-CREATE INDEX IF NOT EXISTS idx_messages_thread [m
+[32m+[m[32mCREATE INDEX idx_messages_thread[m[41m [m
+ ON messages(parent_message_id, sent_at);[m
+ [m
+ -- ============================================================================[m

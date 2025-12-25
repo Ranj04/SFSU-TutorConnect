@@ -1,0 +1,76 @@
+---
+name: Deploy to Staging
+
+# Automatic deployment to staging environment
+# Triggers on: Push to development branch (after CI passes)
+# Deploys to: /home/ubuntu/csc648-fa25-03-team02-staging
+
+on:
+  push:
+    branches: [development]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging Server
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_PORT || 22 }}
+          script: |
+            echo "INFO: Starting staging deployment..."
+
+            # Navigate to staging repo
+            # Pull latest code to get updated deploy script
+            cd /home/ubuntu/csc648-fa25-03-team02-staging
+            git fetch origin
+            git checkout development
+            git reset --hard origin/development
+            git pull origin development
+
+            # Run deployment script from credentials folder
+            echo "INFO: Running deployment script..."
+            bash credentials/deploy.sh staging
+
+      - name: Health Check
+        run: |
+          echo "INFO: Verifying deployment..."
+          sleep 10
+
+          # Check backend health
+          URL="https://staging.sfsututor.site/api/v1/health"
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            "$URL" || echo "000")
+
+          if [ "$response" = "200" ]; then
+            echo "SUCCESS: Backend is healthy"
+          else
+            echo "ERROR: Backend health check failed (HTTP $response)"
+            exit 1
+          fi
+
+          # Check frontend is accessible
+          URL2="https://staging.sfsututor.site"
+          frontend=$(curl -s -o /dev/null -w "%{http_code}" \
+            "$URL2" || echo "000")
+
+          if [ "$frontend" = "200" ]; then
+            echo "SUCCESS: Frontend is accessible"
+          else
+            echo "WARNING: Frontend check returned HTTP $frontend"
+          fi
+
+      - name: Deployment Summary
+        if: success()
+        run: |
+          echo "SUCCESS: Staging deployment completed"
+          echo "INFO: View at https://staging.sfsututor.site"

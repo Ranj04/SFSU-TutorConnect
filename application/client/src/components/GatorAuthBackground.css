@@ -1,0 +1,163 @@
+/**
+ * GatorAuthBackground.css
+ * -----------------------
+ * Styles for the Gator-themed auth page background.
+ * Features SFSU purple/gold colors with alligator motifs.
+ *
+ * Contributors: Ranjiv Jithendran
+ */
+
+.gator-auth-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Main gradient background */
+.gator-gradient {
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(ellipse at 20% 20%, rgba(65, 21, 69, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(200, 155, 60, 0.06) 0%, transparent 50%),
+    linear-gradient(135deg, #fefef8 0%, #f5f0e8 50%, #faf8f2 100%);
+}
+
+/* Animated scale pattern overlay */
+.gator-scales {
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  background-image: 
+    radial-gradient(ellipse 8px 12px at 50% 50%, #411545 50%, transparent 50%);
+  background-size: 24px 20px;
+  animation: scales-shift 20s linear infinite;
+}
+
+@keyframes scales-shift {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(20px); }
+}
+
+/* Floating scale particles */
+.gator-particles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.gator-scale-particle {
+  position: absolute;
+  bottom: -20px;
+  width: 12px;
+  height: 16px;
+  background: linear-gradient(135deg, rgba(65, 21, 69, 0.15) 0%, rgba(200, 155, 60, 0.1) 100%);
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  animation: particle-rise 5s ease-in-out infinite;
+}
+
+@keyframes particle-rise {
+  0% {
+    transform: translateY(0) rotate(0deg) scale(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  90% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(-100vh) rotate(180deg) scale(0.5);
+    opacity: 0;
+  }
+}
+
+/* Corner accents */
+.gator-corner {
+  position: absolute;
+  width: 250px;
+  height: 250px;
+}
+
+.gator-corner-tl {
+  top: 0;
+  left: 0;
+  background: 
+    linear-gradient(135deg, rgba(65, 21, 69, 0.1) 0%, transparent 50%);
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+
+.gator-corner-br {
+  bottom: 0;
+  right: 0;
+  background: 
+    linear-gradient(315deg, rgba(200, 155, 60, 0.08) 0%, transparent 50%);
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+}
+
+/* Wave decoration at bottom */
+.gator-waves {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 80px;
+}
+
+.gator-wave {
+  fill: rgba(65, 21, 69, 0.03);
+}
+
+.gator-wave-1 {
+  animation: wave-move 8s ease-in-out infinite;
+}
+
+.gator-wave-2 {
+  fill: rgba(200, 155, 60, 0.02);
+  animation: wave-move 6s ease-in-out infinite reverse;
+}
+
+@keyframes wave-move {
+  0%, 100% {
+    d: path("M0,60 Q300,20 600,60 T1200,60 V120 H0 Z");
+  }
+  50% {
+    d: path("M0,60 Q300,80 600,60 T1200,60 V120 H0 Z");
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .gator-silhouette {
+    width: 60%;
+    bottom: 2%;
+    right: 2%;
+  }
+  
+  .gator-corner {
+    width: 150px;
+    height: 150px;
+  }
+  
+  .gator-scale-particle {
+    width: 8px;
+    height: 12px;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .gator-scales,
+  .gator-scale-particle,
+  .gator-wave {
+    animation: none !important;
+  }
+}
+
