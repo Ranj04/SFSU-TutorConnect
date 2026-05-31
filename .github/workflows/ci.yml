@@ -44,24 +44,23 @@ jobs:
           pip install -r requirements.txt
           pip install flake8 black
 
-      # TODO: Uncomment when ready to enforce linting
-      # - name: Lint with flake8
-      #   run: |
-      #     # Stop build if there are Python syntax errors or undefined names
-      #     flake8 app --count --select=E9,F63,F7,F82 --show-source --statistics
-      #     # Treat all other issues as warnings
-      #     flake8 app --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-
-      # TODO: Uncomment when ready to enforce code formatting
-      # - name: Check code formatting with black
-      #   run: |
-      #     black --check app tests || echo "Run 'black app tests' to format code"
-
-      # Temporary: Just check syntax (won't fail)
-      - name: Syntax check only (non-blocking)
+      # Blocking: fail the build on real Python errors (syntax errors, undefined
+      # names, etc.). High-signal, low-false-positive.
+      - name: Lint with flake8 (errors only, blocking)
         run: |
-          echo "INFO: Linting is disabled. Run 'flake8 app' and 'black app tests' locally before enabling."
-          python -m py_compile app/**/*.py 2>/dev/null || echo "No Python files to check"
+          flake8 app --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      # Non-blocking: style/complexity warnings surface in logs without failing CI.
+      - name: Lint with flake8 (style, non-blocking)
+        run: |
+          flake8 app --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      # Blocking: byte-compile every module to catch syntax errors. compileall
+      # recurses properly (the old `app/**/*.py` glob did not, so it silently
+      # checked nothing).
+      - name: Compile all modules (blocking)
+        run: |
+          python -m compileall -q app
 
   backend-test:
     name: Backend Tests
@@ -130,17 +129,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # TODO: Uncomment when ready to enforce linting
-      # - name: Lint with ESLint
-      #   run: npm run lint
-
-      # Temporary: Just verify lint script exists (won't fail)
-      - name: Lint check disabled (non-blocking)
-        run: |
-          echo "INFO: Linting is disabled. Run 'npm run lint' locally before enabling."
-          if [ -f "package.json" ] && grep -q '"lint"' package.json; then
-            echo "Lint script exists in package.json"
-          fi
+      # ESLint is now clean, so enforce it as a hard gate on the frontend.
+      - name: Lint with ESLint
+        run: npm run lint
 
   frontend-test:
     name: Frontend Tests

@@ -1,0 +1,33 @@
+# Build context excludes — keep the image small and never bake in secrets.
+
+# VCS / tooling
+.git
+.github
+.claude
+
+# Secrets — MUST NOT be copied into the image
+credentials/
+**/.env
+**/.env.*
+!**/.env.example
+
+# Node
+**/node_modules
+application/client/dist
+
+# Python caches / virtualenvs
+**/__pycache__/
+**/*.py[cod]
+**/venv/
+**/.venv/
+**/env/
+
+# Docs, milestones, and local scripts not needed at runtime
+Milestones/
+**/*.md
+**/*.ps1
+test_api.ps1
+
+# OS cruft
+.DS_Store
+Thumbs.db
