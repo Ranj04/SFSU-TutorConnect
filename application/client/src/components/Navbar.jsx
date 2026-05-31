@@ -335,6 +335,7 @@ export default function Navbar() {
                               localStorage.removeItem("user");
                               localStorage.removeItem("isAuthenticated");
                               localStorage.removeItem("rememberMe");
+                              localStorage.removeItem("authToken");
                               setIsAuthenticated(false);
                               setCurrentUser(null);
                               setShowUserMenu(false);

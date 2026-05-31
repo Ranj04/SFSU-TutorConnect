@@ -26,10 +26,15 @@ async function apiFetch(endpoint, options = {}) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 5000);
   
+  // Attach the bearer token (if any) so the server can identify the caller.
+  // Identity is derived server-side from this token, never from request ids.
+  const authToken = localStorage.getItem('authToken');
+
   try {
     const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         ...options.headers,
       },
       ...options,
@@ -37,6 +42,13 @@ async function apiFetch(endpoint, options = {}) {
     });
 
     clearTimeout(timeoutId);
+
+    // A 401 means our stored session is missing/expired/invalid. Clear it so
+    // the UI can react (route guards will redirect to login).
+    if (response.status === 401) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('isAuthenticated');
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -195,9 +207,13 @@ export async function healthCheck() {
  * @returns {Promise<object>}
  */
 export async function createPosting(postingData) {
+  // The owner (user_id) is derived server-side from the auth token; strip it
+  // from the body if a caller still includes it.
+  // eslint-disable-next-line no-unused-vars
+  const { user_id, ...body } = postingData;
   return await apiFetch('/api/postings', {
     method: 'POST',
-    body: JSON.stringify(postingData),
+    body: JSON.stringify(body),
   });
 }
 
@@ -284,9 +300,10 @@ export async function loginUser(credentials) {
  * @returns {Promise<{message: string, data: object}>}
  */
 export async function sendMessage(messageData) {
+  // The sender is derived server-side from the auth token; never send it.
+  // eslint-disable-next-line no-unused-vars
   const { sender_user_id, ...body } = messageData;
-  const params = new URLSearchParams({ sender_user_id: sender_user_id.toString() });
-  return await apiFetch(`/api/messages?${params.toString()}`, {
+  return await apiFetch(`/api/messages`, {
     method: 'POST',
     body: JSON.stringify(body),
   });
@@ -300,80 +317,70 @@ export async function sendMessage(messageData) {
  * @returns {Promise<{count: number, messages: Array}>}
  */
 export async function getMessageThread(userId, otherUserId, postingId = null) {
+  // The current user is derived server-side from the auth token; only the
+  // conversation partner (and optional posting) are sent.
   const params = new URLSearchParams({
-    user_id: userId.toString(),
     other_user_id: otherUserId.toString(),
   });
-  
+
   if (postingId) {
     params.append('posting_id', postingId.toString());
   }
-  
+
   return await apiFetch(`/api/messages/thread?${params.toString()}`);
 }
 
 /**
- * Get all conversations for a user
- * @param {number} userId - User ID
+ * Get all conversations for the authenticated user (identity from the token).
  * @returns {Promise<{count: number, conversations: Array}>}
  */
-export async function getConversations(userId) {
-  const params = new URLSearchParams({ user_id: userId.toString() });
-  return await apiFetch(`/api/messages/conversations?${params.toString()}`);
+export async function getConversations() {
+  return await apiFetch(`/api/messages/conversations`);
 }
 
 /**
- * Get connection requests (incoming or sent)
- * @param {number} userId - User ID
+ * Get connection requests (incoming or sent) for the authenticated user.
  * @param {string} type - 'incoming' or 'sent'
  * @returns {Promise<{count: number, requests: Array}>}
  */
-export async function getConnectionRequests(userId, type = 'incoming') {
-  const params = new URLSearchParams({ 
-    user_id: userId.toString(),
-    type: type
-  });
+export async function getConnectionRequests(type = 'incoming') {
+  // The user is derived server-side from the auth token; only 'type' is sent.
+  const params = new URLSearchParams({ type });
   return await apiFetch(`/api/messages/connection-requests?${params.toString()}`);
 }
 
 /**
- * Accept a connection request
+ * Accept a connection request (acting user derived from the auth token).
  * @param {number} messageId - Message ID
- * @param {number} userId - User ID (must be recipient)
  * @returns {Promise<{message: string, data: object}>}
  */
-export async function acceptConnectionRequest(messageId, userId) {
-  const params = new URLSearchParams({ user_id: userId.toString() });
-  return await apiFetch(`/api/messages/${messageId}/accept?${params.toString()}`, {
+export async function acceptConnectionRequest(messageId) {
+  return await apiFetch(`/api/messages/${messageId}/accept`, {
     method: 'PATCH',
   });
 }
 
 /**
- * Decline a connection request
+ * Decline a connection request (acting user derived from the auth token).
  * @param {number} messageId - Message ID
- * @param {number} userId - User ID (must be recipient)
  * @returns {Promise<{message: string, data: object}>}
  */
-export async function declineConnectionRequest(messageId, userId) {
-  const params = new URLSearchParams({ user_id: userId.toString() });
-  return await apiFetch(`/api/messages/${messageId}/decline?${params.toString()}`, {
+export async function declineConnectionRequest(messageId) {
+  return await apiFetch(`/api/messages/${messageId}/decline`, {
     method: 'PATCH',
   });
 }
 
 /**
- * Create a review for a posting
+ * Create a review for a posting (reviewing student derived from the auth token).
  * @param {object} data
  * @param {number} data.posting_id - Posting ID
  * @param {number} data.rating - Rating 1-5
  * @param {string} [data.comment] - Optional comment
- * @param {number} data.student_user_id - Current user ID
  * @returns {Promise<{message: string, data: object}>}
  */
-export async function createReview({ posting_id, rating, comment = "", student_user_id }) {
-  const params = new URLSearchParams({ student_user_id: student_user_id.toString() });
-  return await apiFetch(`/api/reviews?${params.toString()}`, {
+export async function createReview({ posting_id, rating, comment = "" }) {
+  return await apiFetch(`/api/reviews`, {
     method: 'POST',
     body: JSON.stringify({ posting_id, rating, comment }),
   });

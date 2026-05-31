@@ -9,6 +9,7 @@
  * Contributors: Ranjiv Jithendran, Team 02
  */
 import React from "react";
+// eslint-disable-next-line no-unused-vars -- `motion` is used via <motion.*> JSX
 import { motion } from "framer-motion";
 import "./HeroAnimation.css";
 

@@ -7,14 +7,14 @@
  *
  * Contributors: Ranjiv Jithendran, Dhvanil Bhagat
  */
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useSearchParams, Link, Navigate, useLocation } from "react-router-dom";
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "../hooks/useToast";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { sendTutorMessage } from "../services/messagesService";
-import { isAuthenticated, getCurrentUser } from "../components/ProtectedRoute";
+import { isAuthenticated, getCurrentUser } from "../utils/auth";
 
 export default function ContactTutor() {
   const [searchParams] = useSearchParams();

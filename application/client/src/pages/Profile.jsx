@@ -8,9 +8,10 @@
  */
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+// eslint-disable-next-line no-unused-vars -- `motion` is used via <motion.*> JSX
 import { motion } from "framer-motion";
 import { getUserProfile, updateUserProfile, updateTutorProfile, updateProfilePhoto } from "../services/api";
-import { getCurrentUser, isAuthenticated } from "../components/ProtectedRoute";
+import { getCurrentUser } from "../utils/auth";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 
 export default function Profile() {

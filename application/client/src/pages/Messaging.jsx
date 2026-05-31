@@ -7,20 +7,18 @@
  * Contributors: Ranjiv Jithendran, Team 02
  */
 import React, { useState, useEffect, useCallback } from "react";
-import { useSearchParams, Link, Navigate } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { getMessageThread, sendMessage as sendMessageAPI } from "../services/api";
-import { isAuthenticated, getCurrentUser } from "../components/ProtectedRoute";
+import { getCurrentUser } from "../utils/auth";
 
 export default function Messaging() {
   const [searchParams] = useSearchParams();
   const tutorId = searchParams.get("tutorId");
   const otherUserId = searchParams.get("userId");
 
-  // Auth check - redirect to login if not authenticated
-  if (!isAuthenticated()) {
-    return <Navigate to="/login?redirect=/messaging" replace />;
-  }
-
+  // Authentication is enforced by <ProtectedRoute> in App.jsx; no in-component
+  // early return (that would run before the hooks below and violate the Rules
+  // of Hooks).
   const currentUser = getCurrentUser();
   const currentUserId = currentUser?.id;
 
@@ -65,10 +63,11 @@ export default function Messaging() {
       setSending(true);
       setError(null);
 
+      // sender is derived server-side from the auth token; do not send it.
+      // The backend MessageCreate model takes posting_id (not tutor_profile_id).
       await sendMessageAPI({
-        sender_user_id: currentUserId,
         recipient_user_id: parseInt(otherUserId),
-        tutor_profile_id: tutorId ? parseInt(tutorId) : null,
+        posting_id: tutorId ? parseInt(tutorId) : null,
         message_text: newMessage.trim(),
       });
 

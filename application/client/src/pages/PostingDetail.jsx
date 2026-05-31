@@ -13,7 +13,7 @@ import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { getPostingById, updatePostingStatus } from "../services/postingsService";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
-import { isAuthenticated } from "../components/ProtectedRoute";
+import { isAuthenticated } from "../utils/auth";
 
 export default function PostingDetail() {
   const { postingId } = useParams();

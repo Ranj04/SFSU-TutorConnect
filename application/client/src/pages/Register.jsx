@@ -9,6 +9,7 @@
  */
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+// eslint-disable-next-line no-unused-vars -- `motion` is used via <motion.*> JSX
 import { motion } from "framer-motion";
 import SFSUEmailHint from "../components/ui/SFSUEmailHint";
 import { registerUser } from "../services/api";
@@ -113,10 +114,13 @@ export default function Register() {
       // Call the real API
       const response = await registerUser(userData);
       
-      // Store user data from API response
+      // Store the auth token and user data from API response
+      if (response.access_token) {
+        localStorage.setItem("authToken", response.access_token);
+      }
       localStorage.setItem("user", JSON.stringify(response.user));
       localStorage.setItem("isAuthenticated", "true");
-      
+
       setLoading(false);
       navigate("/dashboard");
     } catch (error) {

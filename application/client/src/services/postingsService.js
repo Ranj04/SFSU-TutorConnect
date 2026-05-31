@@ -6,7 +6,7 @@
  *
  * Contributors: Ranjiv Jithendran, Dhvanil Bhagat
  */
-import { searchTutors, createPosting as apiCreatePosting, getPostings as apiGetPostings, getPostingById as apiGetPostingById } from './api';
+import { searchTutors, createPosting as apiCreatePosting, getPostingById as apiGetPostingById } from './api';
 import { SEED_POSTINGS, initializeSeedData } from '../data/seedData';
 
 /**

@@ -8,18 +8,14 @@
  * Contributors: Ranjiv Jithendran, Dhvanil Bhagat
  */
 import React, { useState, useEffect } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { getConnectionRequests, acceptConnectionRequest, declineConnectionRequest } from "../services/api";
-import { isAuthenticated, getCurrentUser } from "../components/ProtectedRoute";
+import { getCurrentUser } from "../utils/auth";
 
 export default function Messages() {
-  const navigate = useNavigate();
-  
-  // Auth check - redirect to login if not authenticated
-  if (!isAuthenticated()) {
-    return <Navigate to="/login?redirect=/messages" replace />;
-  }
-  
+  // Authentication is enforced by <ProtectedRoute> in App.jsx; no in-component
+  // early return (that would run before the hooks below and violate the Rules
+  // of Hooks).
   const currentUser = getCurrentUser();
   const currentUserId = currentUser?.id;
   
@@ -46,10 +42,10 @@ export default function Messages() {
         
         // Fetch both incoming and sent requests
         const [incomingResponse, sentResponse] = await Promise.all([
-          getConnectionRequests(currentUserId, 'incoming'),
-          getConnectionRequests(currentUserId, 'sent')
+          getConnectionRequests('incoming'),
+          getConnectionRequests('sent')
         ]);
-        
+
         setIncomingRequests(incomingResponse.requests || []);
         setSentRequests(sentResponse.requests || []);
       } catch (err) {
@@ -70,12 +66,12 @@ export default function Messages() {
     
     try {
       setProcessingId(messageId);
-      await acceptConnectionRequest(messageId, currentUserId);
+      await acceptConnectionRequest(messageId);
       
       // Refresh requests
       const [incomingResponse, sentResponse] = await Promise.all([
-        getConnectionRequests(currentUserId, 'incoming'),
-        getConnectionRequests(currentUserId, 'sent')
+        getConnectionRequests('incoming'),
+        getConnectionRequests('sent')
       ]);
       
       setIncomingRequests(incomingResponse.requests || []);
@@ -97,12 +93,12 @@ export default function Messages() {
     
     try {
       setProcessingId(messageId);
-      await declineConnectionRequest(messageId, currentUserId);
+      await declineConnectionRequest(messageId);
       
       // Refresh requests
       const [incomingResponse, sentResponse] = await Promise.all([
-        getConnectionRequests(currentUserId, 'incoming'),
-        getConnectionRequests(currentUserId, 'sent')
+        getConnectionRequests('incoming'),
+        getConnectionRequests('sent')
       ]);
       
       setIncomingRequests(incomingResponse.requests || []);

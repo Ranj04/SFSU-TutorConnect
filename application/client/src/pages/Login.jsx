@@ -9,6 +9,7 @@
  */
 import React, { useState } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
+// eslint-disable-next-line no-unused-vars -- `motion` is used via <motion.*> JSX
 import { motion } from "framer-motion";
 import { loginUser } from "../services/api";
 import GatorAuthBackground from "../components/GatorAuthBackground";
@@ -84,10 +85,13 @@ export default function Login() {
         password: formData.password,
       });
       
-      // Store user data from API response
+      // Store the auth token and user data from API response
+      if (response.access_token) {
+        localStorage.setItem("authToken", response.access_token);
+      }
       localStorage.setItem("user", JSON.stringify(response.user));
       localStorage.setItem("isAuthenticated", "true");
-      
+
       if (formData.rememberMe) {
         localStorage.setItem("rememberMe", "true");
       }

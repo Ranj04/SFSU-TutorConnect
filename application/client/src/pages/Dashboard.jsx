@@ -8,13 +8,13 @@
  * Contributors: Ranjiv Jithendran, Dhvanil Bhagat
  */
 import React, { useState, useEffect } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { getUserMessages } from "../services/messagesService";
 import { getPostings, updateProfilePhoto, getConnectionRequests, acceptConnectionRequest, declineConnectionRequest } from "../services/api";
-import { isAuthenticated, getCurrentUser, isTutorApproved } from "../components/ProtectedRoute";
+import { getCurrentUser, isTutorApproved } from "../utils/auth";
 import { createReview } from "../services/api";
 import { useNavigate } from "react-router-dom";
 
@@ -112,12 +112,12 @@ export default function Dashboard() {
   // Note: Having tutor capability does NOT remove student features - users can do both!
   const currentUser = getCurrentUser() || {};
   const canTutor = isTutorApproved(); // Has additional tutor features enabled
-  
-  // Redirect to login if not authenticated
-  if (!isAuthenticated()) {
-    return <Navigate to="/login?redirect=/dashboard" replace />;
-  }
-  
+
+  // Note: authentication is enforced by the <ProtectedRoute> wrapper in App.jsx,
+  // so there is no in-component early return here. Returning before the hooks
+  // below would violate the Rules of Hooks (hooks must run in the same order on
+  // every render).
+
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = sessionStorage.getItem("dashboardTab");
     // Default to messages sent, but respect saved tab if valid
@@ -390,8 +390,8 @@ export default function Dashboard() {
         setRequestsError(null);
         
         const [incomingResponse, sentResponse] = await Promise.all([
-          getConnectionRequests(currentUser.id, 'incoming'),
-          getConnectionRequests(currentUser.id, 'sent')
+          getConnectionRequests('incoming'),
+          getConnectionRequests('sent')
         ]);
         
         setIncomingRequests(incomingResponse.requests || []);
@@ -414,12 +414,12 @@ export default function Dashboard() {
     
     try {
       setProcessingId(messageId);
-      await acceptConnectionRequest(messageId, currentUser.id);
+      await acceptConnectionRequest(messageId);
       
       // Refresh requests
       const [incomingResponse, sentResponse] = await Promise.all([
-        getConnectionRequests(currentUser.id, 'incoming'),
-        getConnectionRequests(currentUser.id, 'sent')
+        getConnectionRequests('incoming'),
+        getConnectionRequests('sent')
       ]);
       
       setIncomingRequests(incomingResponse.requests || []);
@@ -441,12 +441,12 @@ export default function Dashboard() {
     
     try {
       setProcessingId(messageId);
-      await declineConnectionRequest(messageId, currentUser.id);
+      await declineConnectionRequest(messageId);
       
       // Refresh requests
       const [incomingResponse, sentResponse] = await Promise.all([
-        getConnectionRequests(currentUser.id, 'incoming'),
-        getConnectionRequests(currentUser.id, 'sent')
+        getConnectionRequests('incoming'),
+        getConnectionRequests('sent')
       ]);
       
       setIncomingRequests(incomingResponse.requests || []);

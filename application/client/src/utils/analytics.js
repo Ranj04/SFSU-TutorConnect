@@ -11,8 +11,9 @@
  */
 import ReactGA from "react-ga4";
 
-// GA4 Measurement ID - can be overridden via .env file as VITE_GA_MEASUREMENT_ID
-const MEASUREMENT_ID = import.meta.env.VITE_GA_MEASUREMENT_ID || "G-PV011DLSWY";
+// GA4 Measurement ID - configured per environment via .env (VITE_GA_MEASUREMENT_ID).
+// No hardcoded fallback: if unset, analytics simply no-ops (see initGA guard below).
+const MEASUREMENT_ID = import.meta.env.VITE_GA_MEASUREMENT_ID || "";
 
 /**
  * Initialize Google Analytics
