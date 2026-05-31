@@ -26,11 +26,13 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parent
 MIGRATIONS_DIR = ROOT / "db" / "migrations"
 
+# No hardcoded password default: the DB password must come from DATABASE_URL or
+# the DB_PASSWORD environment variable (never committed to the repo).
 DEFAULTS = {
     "DB_HOST": "127.0.0.1",
     "DB_PORT": "3306",
     "DB_USER": "app_user",
-    "DB_PASSWORD": "team02db",
+    "DB_PASSWORD": "",
     "DB_NAME": "csc648_tutoring_platform",
 }
 
@@ -192,10 +194,33 @@ def main() -> int:
                     
                     print(f"[SUCCESS] {migration_file.name} completed")
                 except Exception as e:
-                    # Check if it's a "duplicate column" or "column already exists" error
+                    # Determine whether this failure simply means the migration is
+                    # ALREADY APPLIED (so a redeploy can safely continue). We match
+                    # by MySQL error code (robust) plus message text (fallback).
+                    #
+                    # DDL in MySQL implicitly commits, so a failed ALTER/CREATE here
+                    # does not poison a surrounding transaction; we can keep going.
                     error_msg = str(e).lower()
-                    if "duplicate column" in error_msg or "already exists" in error_msg:
-                        print(f"[SKIP] {migration_file.name} - changes already applied (column exists)")
+                    mysql_code = e.args[0] if getattr(e, "args", None) else None
+                    ALREADY_APPLIED_CODES = {
+                        1050,  # table already exists
+                        1060,  # duplicate column name
+                        1061,  # duplicate key/index name (e.g. UNIQUE constraint)
+                        1022,  # can't write; duplicate key in table
+                        1826,  # duplicate foreign key constraint name
+                        1091,  # can't DROP; check that the column/key exists
+                        1062,  # duplicate entry for a unique key (idempotent re-insert)
+                    }
+                    already_applied = (
+                        mysql_code in ALREADY_APPLIED_CODES
+                        or "duplicate column" in error_msg
+                        or "already exists" in error_msg
+                        or "duplicate key name" in error_msg
+                        or "duplicate foreign key" in error_msg
+                        or "duplicate entry" in error_msg
+                    )
+                    if already_applied:
+                        print(f"[SKIP] {migration_file.name} - already applied (code={mysql_code})")
                     elif "data too long" in error_msg or "1406" in str(e):
                         # Handle data too long errors - this means we need to clean data first
                         print(f"[WARN] {migration_file.name} - data too long, attempting to clean and retry...")
