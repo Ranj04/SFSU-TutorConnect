@@ -133,8 +133,8 @@ def test_mysql_connection():
             print("  → Start MySQL service and try again")
         elif error_code == 1045:
             print(f"  → Authentication failed for user '{DB_USER}'")
-            print(f"  → Check password in setup_db.py and config.py")
-            print(f"  → Default password is: {DB_PASSWORD}")
+            print(f"  → Check the DB password in your .env / DATABASE_URL")
+            print(f"  → Password is {'set' if DB_PASSWORD else 'NOT set'} in the environment")
         elif error_code == 1049:
             print(f"  → Database '{DB_NAME}' does not exist")
             print(f"  → Create it first, then run setup_db.py")

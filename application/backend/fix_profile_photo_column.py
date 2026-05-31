@@ -18,11 +18,12 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parent
 ENV_PATH = ROOT / ".env"
 
+# No hardcoded password default: supply it via DATABASE_URL or DB_PASSWORD.
 DEFAULTS = {
     "DB_HOST": "127.0.0.1",
     "DB_PORT": "3306",
     "DB_USER": "app_user",
-    "DB_PASSWORD": "team02db",
+    "DB_PASSWORD": "",
     "DB_NAME": "csc648_tutoring_platform",
 }
 

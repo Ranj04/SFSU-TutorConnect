@@ -34,6 +34,11 @@ def search_tutors(
     Returns:
         Tuple of (list of posting dictionaries, total count)
     """
+    # Defense in depth: clamp paging so a caller that forwards unbounded values
+    # can never request an enormous page or a non-positive page number.
+    page = max(1, page)
+    limit = max(1, min(limit, 50))
+
     # Base query: only approved postings with eager loading
     query = db.query(Posting).filter(
         Posting.status == 'approved'

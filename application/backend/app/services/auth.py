@@ -22,10 +22,17 @@ def hash_password(password: str) -> str:
     """
     if not password:
         raise ValueError("Password cannot be empty")
-    
+
+    # bcrypt silently ignores bytes past position 72. Reject longer inputs here
+    # (defense in depth; the API layer also validates) so two distinct long
+    # passwords sharing a 72-byte prefix can never authenticate interchangeably.
+    encoded = password.encode('utf-8')
+    if len(encoded) > 72:
+        raise ValueError("Password must be at most 72 bytes long")
+
     # Generate salt and hash password
     salt = bcrypt.gensalt()
-    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+    hashed = bcrypt.hashpw(encoded, salt)
     return hashed.decode('utf-8')
 
 

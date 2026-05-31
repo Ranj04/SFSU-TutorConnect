@@ -13,7 +13,8 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 
 from app.db.database import get_db
-from app.db.models import Posting, Message
+from app.db.models import Posting, Message, User
+from app.dependencies import get_current_user
 
 router = APIRouter(prefix="/api/reviews", tags=["reviews"])
 
@@ -28,8 +29,8 @@ class ReviewCreate(BaseModel):
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_review(
   review_data: ReviewCreate,
-  student_user_id: int = Query(..., description="ID of the student leaving the review"),
   db: Session = Depends(get_db),
+  current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
   """
   Create a new review for a posting and update its average rating.
@@ -39,8 +40,10 @@ def create_review(
   - A new row is inserted into the legacy `reviews` table (polymorphic: target_type='posting').
   - The posting's `avg_rating` and `review_count` are recalculated from all approved reviews.
 
-  Note: In production, `student_user_id` should come from the authenticated user/JWT.
+  The acting student is derived from the authenticated user, never the client.
   """
+  student_user_id = current_user.id
+
   # Verify posting exists
   posting = db.query(Posting).filter(Posting.id == review_data.posting_id).first()
   if not posting:

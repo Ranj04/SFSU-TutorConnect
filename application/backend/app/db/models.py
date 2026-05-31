@@ -8,7 +8,7 @@ Contributors: Ranjiv Jithendran, Dhvanil Bhagat
 """
 from sqlalchemy import (
     BigInteger, Boolean, Column, DateTime, Enum, ForeignKey,
-    Integer, String, Text, DECIMAL, CheckConstraint, Index
+    Integer, String, Text, DECIMAL, CheckConstraint, Index, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -34,6 +34,7 @@ class User(Base):
         nullable=False,
         default='active'
     )
+    is_admin = Column(Boolean, nullable=False, default=False, server_default='0')
     last_login = Column(DateTime(6), nullable=True)
     created_at = Column(DateTime(6), nullable=False, server_default=func.current_timestamp())
     updated_at = Column(
@@ -93,7 +94,6 @@ class TutorProfile(Base):
     user = relationship("User", back_populates="tutor_profile", foreign_keys=[user_id])
     subjects = relationship("Subject", secondary="tutor_subjects", back_populates="tutors")
     courses = relationship("TutorCourse", back_populates="tutor_profile")
-    reviews = relationship("Review", back_populates="tutor_profile")
 
 
 class Subject(Base):
@@ -221,18 +221,25 @@ class TutorCourse(Base):
 
 
 class Review(Base):
-    """Review model representing reviews table."""
+    """
+    Review model representing the polymorphic `reviews` table (migration 004).
+
+    Reviews can target either a posting or a user via (target_type, target_id).
+    The enum values ('posting','user') mirror migration 004_social.sql exactly.
+    The reviews route writes rows via parameterized raw SQL; this model keeps the
+    ORM truthful for any code that reads reviews through SQLAlchemy.
+    """
     __tablename__ = "reviews"
-    
+
     id = Column(BigInteger, primary_key=True, autoincrement=True)
-    student_user_id = Column(BigInteger, ForeignKey('users.id', ondelete='RESTRICT'), nullable=False)
-    tutor_profile_id = Column(BigInteger, ForeignKey('tutor_profiles.id', ondelete='RESTRICT'), nullable=False)
-    course_id = Column(BigInteger, ForeignKey('courses.id', ondelete='SET NULL'), nullable=True)
+    reviewer_user_id = Column(BigInteger, ForeignKey('users.id', ondelete='RESTRICT'), nullable=False)
+    target_type = Column(Enum('posting', 'user', name='review_target_type'), nullable=False)
+    target_id = Column(BigInteger, nullable=False)
     rating = Column(Integer, nullable=False)
     comment = Column(Text, nullable=True)
-    is_approved = Column(Boolean, nullable=False, default=True)
-    is_flagged = Column(Boolean, nullable=False, default=False)
-    is_deleted = Column(Boolean, nullable=False, default=False)
+    is_approved = Column(Boolean, nullable=False, default=True, server_default='1')
+    is_flagged = Column(Boolean, nullable=False, default=False, server_default='0')
+    is_deleted = Column(Boolean, nullable=False, default=False, server_default='0')
     created_at = Column(DateTime(6), nullable=False, server_default=func.current_timestamp())
     updated_at = Column(
         DateTime(6),
@@ -240,9 +247,15 @@ class Review(Base):
         server_default=func.current_timestamp(),
         onupdate=func.current_timestamp()
     )
-    
+
+    __table_args__ = (
+        CheckConstraint('rating BETWEEN 1 AND 5', name='chk_rating_range'),
+        UniqueConstraint('reviewer_user_id', 'target_type', 'target_id', name='uq_review_once'),
+        Index('idx_reviews_target', 'target_type', 'target_id'),
+    )
+
     # Relationships
-    tutor_profile = relationship("TutorProfile", back_populates="reviews")
+    reviewer = relationship("User", foreign_keys=[reviewer_user_id])
 
 
 class Message(Base):

@@ -10,12 +10,14 @@ Contributors: Ranjiv Jithendran, Dhvanil Bhagat
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 from app.db.database import get_db
 from app.db.models import Message, User, Posting
+from app.dependencies import get_current_user
 
 router = APIRouter(prefix="/api/messages", tags=["messaging"])
 
@@ -54,8 +56,8 @@ class MessageResponse(BaseModel):
 @router.post("", status_code=status.HTTP_201_CREATED)
 def send_message(
     message_data: MessageCreate,
-    sender_user_id: int = Query(..., description="ID of the user sending the message"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
     Send a new message from a student to a tutor (ONE-WAY).
@@ -77,14 +79,10 @@ def send_message(
     
     **Note:** In production, sender_user_id should come from authenticated session/JWT token.
     """
-    # Verify sender exists
-    sender = db.query(User).filter(User.id == sender_user_id).first()
-    if not sender:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Sender user not found"
-        )
-    
+    # Sender is the authenticated user (never trust a client-supplied id)
+    sender = current_user
+    sender_user_id = current_user.id
+
     # Verify recipient exists
     recipient = db.query(User).filter(User.id == message_data.recipient_user_id).first()
     if not recipient:
@@ -100,18 +98,21 @@ def send_message(
         if posting:
             posting_title = posting.title
     
-    # Check if student already messaged this tutor (enforce one-round rule)
+    # Enforce one initial message per (student, tutor, posting), matching the
+    # documented per-posting model. The check-then-insert has a small TOCTOU
+    # window, so the commit is additionally guarded with IntegrityError handling.
     existing_message = db.query(Message).filter(
         Message.sender_user_id == sender_user_id,
-        Message.recipient_user_id == message_data.recipient_user_id
+        Message.recipient_user_id == message_data.recipient_user_id,
+        Message.posting_id == message_data.posting_id,
     ).first()
-    
+
     if existing_message:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You have already sent a message to this tutor. Please wait for them to respond via email/phone."
+            detail="You have already sent a message about this posting. Please wait for them to respond via email/phone."
         )
-    
+
     # Create message
     new_message = Message(
         sender_user_id=sender_user_id,
@@ -123,9 +124,16 @@ def send_message(
         connection_status='pending',
         is_read=False
     )
-    
+
     db.add(new_message)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You have already sent a message about this posting."
+        )
     db.refresh(new_message)
     
     return {
@@ -149,8 +157,8 @@ def send_message(
 
 @router.get("/conversations")
 def get_conversations(
-    user_id: int = Query(..., description="ID of the user to get conversations for"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
     Get all conversations for a user (messages where user is sender or recipient).
@@ -164,16 +172,10 @@ def get_conversations(
     **Returns:**
     - List of conversations with other users, including last message preview and posting info
     
-    **Note:** In production, user_id should come from authenticated session/JWT token.
     """
-    # Verify user exists
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
+    user = current_user
+    user_id = current_user.id
+
     # Get all messages where user is sender or recipient
     messages = db.query(Message).filter(
         or_(
@@ -182,6 +184,16 @@ def get_conversations(
         )
     ).order_by(Message.sent_at.desc()).all()
     
+    # Batch-fetch all conversation partners in a single query (avoid N+1).
+    partner_ids = {
+        (msg.recipient_user_id if msg.sender_user_id == user_id else msg.sender_user_id)
+        for msg in messages
+    }
+    partners_by_id = {}
+    if partner_ids:
+        for u in db.query(User).filter(User.id.in_(partner_ids)).all():
+            partners_by_id[u.id] = u
+
     # Group by conversation partner AND posting (separate conversations per posting)
     conversations = {}
     for msg in messages:
@@ -190,13 +202,13 @@ def get_conversations(
             partner_id = msg.recipient_user_id
         else:
             partner_id = msg.sender_user_id
-        
+
         # Create unique key for partner + posting combination
         conversation_key = f"{partner_id}_{msg.posting_id if msg.posting_id else 'general'}"
-        
+
         # Get or create conversation entry (only keep most recent per posting)
         if conversation_key not in conversations:
-            partner = db.query(User).filter(User.id == partner_id).first()
+            partner = partners_by_id.get(partner_id)
             conversations[conversation_key] = {
                 "message_id": msg.id,
                 "conversation_key": conversation_key,
@@ -221,9 +233,9 @@ def get_conversations(
 
 @router.get("/connection-requests")
 def get_connection_requests(
-    user_id: int = Query(..., description="ID of the user to get connection requests for"),
     type: str = Query("incoming", description="Type of requests: 'incoming' (received) or 'sent' (sent by user)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
     Get connection requests for a user (incoming or sent).
@@ -235,16 +247,10 @@ def get_connection_requests(
     **Returns:**
     - List of connection requests with full details
     
-    **Note:** In production, user_id should come from authenticated session/JWT token.
     """
-    # Verify user exists
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
+    user = current_user
+    user_id = current_user.id
+
     # Build query based on type
     if type == "incoming":
         # Messages where user is recipient
@@ -262,12 +268,22 @@ def get_connection_requests(
             detail="Type must be 'incoming' or 'sent'"
         )
     
+    # Batch-fetch all senders/recipients in a single query (avoid N+1).
+    person_ids = set()
+    for msg in messages:
+        person_ids.add(msg.sender_user_id)
+        person_ids.add(msg.recipient_user_id)
+    people_by_id = {}
+    if person_ids:
+        for u in db.query(User).filter(User.id.in_(person_ids)).all():
+            people_by_id[u.id] = u
+
     # Format messages
     requests = []
     for msg in messages:
-        sender = db.query(User).filter(User.id == msg.sender_user_id).first()
-        recipient = db.query(User).filter(User.id == msg.recipient_user_id).first()
-        
+        sender = people_by_id.get(msg.sender_user_id)
+        recipient = people_by_id.get(msg.recipient_user_id)
+
         requests.append({
             "id": msg.id,
             "sender_user_id": msg.sender_user_id,
@@ -293,10 +309,10 @@ def get_connection_requests(
 
 @router.get("/thread")
 def get_message_thread(
-    user_id: int = Query(..., description="ID of the current user"),
     other_user_id: int = Query(..., description="ID of the conversation partner"),
     posting_id: Optional[int] = Query(None, description="Optional posting ID to filter conversation"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
     Get message between two users for a specific posting (ONE-WAY system: only one message per pair per posting).
@@ -312,13 +328,13 @@ def get_message_thread(
     **Returns:**
     - The single message in the conversation (if any)
     
-    **Note:** In production, user_id should come from authenticated session/JWT token.
     """
-    # Verify users exist
-    user = db.query(User).filter(User.id == user_id).first()
+    user = current_user
+    user_id = current_user.id
+
     other_user = db.query(User).filter(User.id == other_user_id).first()
-    
-    if not user or not other_user:
+
+    if not other_user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
@@ -369,8 +385,8 @@ def get_message_thread(
 @router.patch("/{message_id}/read", status_code=status.HTTP_200_OK)
 def mark_message_read(
     message_id: int,
-    user_id: int = Query(..., description="ID of the user marking the message as read"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
     Mark a message as read (tutor viewing student's message).
@@ -395,14 +411,14 @@ def mark_message_read(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Message not found"
         )
-    
+
     # Verify user is the recipient
-    if message.recipient_user_id != user_id:
+    if message.recipient_user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the message recipient can mark it as read"
         )
-    
+
     # Update message
     message.is_read = True
     db.commit()
@@ -420,8 +436,8 @@ def mark_message_read(
 @router.patch("/{message_id}/accept", status_code=status.HTTP_200_OK)
 def accept_connection_request(
     message_id: int,
-    user_id: int = Query(..., description="ID of the user accepting the request (must be recipient)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
     Accept a connection request (tutor accepting student's message).
@@ -448,12 +464,12 @@ def accept_connection_request(
         )
     
     # Verify user is the recipient
-    if message.recipient_user_id != user_id:
+    if message.recipient_user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the message recipient can accept the connection request"
         )
-    
+
     # Update message
     message.connection_status = 'accepted'
     message.is_read = True
@@ -477,8 +493,8 @@ def accept_connection_request(
 @router.patch("/{message_id}/decline", status_code=status.HTTP_200_OK)
 def decline_connection_request(
     message_id: int,
-    user_id: int = Query(..., description="ID of the user declining the request (must be recipient)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
     Decline a connection request (tutor declining student's message).
@@ -505,12 +521,12 @@ def decline_connection_request(
         )
     
     # Verify user is the recipient
-    if message.recipient_user_id != user_id:
+    if message.recipient_user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the message recipient can decline the connection request"
         )
-    
+
     # Update message
     message.connection_status = 'declined'
     message.is_read = True

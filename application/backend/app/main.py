@@ -9,7 +9,10 @@ Contributors: Ranjiv Jithendran, Dhvanil Bhagat
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
+import os
 import time
 import logging
 
@@ -23,39 +26,26 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI application
-# Note: To handle large base64-encoded images, uvicorn should be started with:
-# uvicorn app.main:app --reload --limit-max-requests 1000
-# For production, configure your reverse proxy (nginx/apache) to allow larger request bodies
-app = FastAPI(
-    title="TutorConnect API",
-    description="SFSU Tutoring Platform API for Milestone 3",
-    version="0.2.0"
-)
-
-
-# Startup event to verify database schema
-@app.on_event("startup")
-async def verify_database_schema():
-    """Verify critical database schema on startup. Non-blocking - won't fail app startup."""
+# Lifespan handler: verify critical DB schema on startup (non-fatal). Replaces
+# the deprecated @app.on_event("startup") hook (removed in newer Starlette).
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     try:
         from app.db.database import get_db
         from sqlalchemy import text
-        
-        # Get a database session
+
         db = next(get_db())
-        
         try:
             # Check if profile_photo_url column is TEXT type
             result = db.execute(text("""
-                SELECT DATA_TYPE, CHARACTER_MAXIMUM_LENGTH 
-                FROM INFORMATION_SCHEMA.COLUMNS 
+                SELECT DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
+                FROM INFORMATION_SCHEMA.COLUMNS
                 WHERE TABLE_SCHEMA = DATABASE()
-                AND TABLE_NAME = 'users' 
+                AND TABLE_NAME = 'users'
                 AND COLUMN_NAME = 'profile_photo_url'
             """))
             column_info = result.fetchone()
-            
+
             if column_info:
                 data_type = column_info[0].lower() if column_info[0] else None
                 if data_type not in ('text', 'longtext', 'mediumtext'):
@@ -70,18 +60,33 @@ async def verify_database_schema():
         finally:
             db.close()
     except Exception as e:
-        # Log warning but don't fail startup - database might not be available yet
-        logger.warning(f"Could not verify database schema on startup: {e}")
+        # Log but don't fail startup - the database might not be available yet.
+        logger.error(f"Could not verify database schema on startup: {e}")
         logger.info("Application will continue to start - schema verification is optional")
 
+    yield
 
-# Configure CORS for frontend integration
+
+# Create FastAPI application.
+# Request body size is bounded by the middleware below and SHOULD also be enforced
+# at the reverse proxy (nginx: client_max_body_size). Note: uvicorn's
+# --limit-max-requests controls request COUNT before worker restart, NOT body size.
+app = FastAPI(
+    title="TutorConnect API",
+    description="SFSU Tutoring Platform API",
+    version="0.2.0",
+    lifespan=lifespan,
+)
+
+
+# Configure CORS for frontend integration. Methods/headers are restricted to the
+# set the app actually uses (credentialed CORS with wildcards is unsafe).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
@@ -94,21 +99,36 @@ async def check_request_size(request: Request, call_next):
     
     if request.method in ("POST", "PUT", "PATCH"):
         content_length = request.headers.get("content-length")
-        if content_length:
-            try:
-                size = int(content_length)
-                if size > MAX_BODY_SIZE:
-                    return JSONResponse(
-                        status_code=413,
-                        content={
-                            "error": "Payload Too Large",
-                            "message": f"Request body size ({size} bytes) exceeds maximum allowed size ({MAX_BODY_SIZE} bytes)",
-                            "detail": "Please reduce the size of your request. For images, consider compressing them or using a smaller file."
-                        }
-                    )
-            except ValueError:
-                pass  # Invalid content-length, let it through
-    
+        # Require Content-Length on body-bearing requests so the limit cannot be
+        # bypassed by omitting the header (or using chunked transfer encoding).
+        if content_length is None:
+            return JSONResponse(
+                status_code=411,
+                content={
+                    "error": "Length Required",
+                    "message": "A Content-Length header is required for this request.",
+                }
+            )
+        try:
+            size = int(content_length)
+        except ValueError:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": "Bad Request",
+                    "message": "Invalid Content-Length header.",
+                }
+            )
+        if size > MAX_BODY_SIZE:
+            return JSONResponse(
+                status_code=413,
+                content={
+                    "error": "Payload Too Large",
+                    "message": f"Request body size ({size} bytes) exceeds maximum allowed size ({MAX_BODY_SIZE} bytes)",
+                    "detail": "Please reduce the size of your request. For images, consider compressing them or using a smaller file."
+                }
+            )
+
     response = await call_next(request)
     return response
 
@@ -161,7 +181,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={
             "error": "Internal Server Error",
             "message": "An unexpected error occurred",
-            "detail": str(exc) if settings.API_DEBUG else "Please contact support if the problem persists"
+            "detail": str(exc) if (settings.API_DEBUG and not settings.is_production) else "Please contact support if the problem persists"
         }
     )
 
@@ -179,14 +199,53 @@ app.include_router(reviews.router)
 def health_check():
     return {"status": "ok", "message": "TutorConnect API is running"}
 
-@app.get("/")
-def root():
-    return {
-        "message": "Welcome to TutorConnect API",
-        "version": "0.1.0",
-        "docs": "/docs"
-    }
-
 @app.get("/api/v1/health")
 def api_health():
     return {"status": "ok", "api": "v1"}
+
+
+# ---------------------------------------------------------------------------
+# Static frontend (single-service / combined deploy)
+# ---------------------------------------------------------------------------
+# In the combined Railway deployment the Vite build is copied to ./static
+# (see Dockerfile), so FastAPI serves the SPA from the SAME origin as the API
+# and no CORS is required. When the build is absent (e.g. API-only local dev),
+# all of this is skipped and "/" returns the JSON welcome instead.
+_STATIC_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "static"))
+_STATIC_INDEX = os.path.join(_STATIC_DIR, "index.html")
+_SERVE_SPA = os.path.isfile(_STATIC_INDEX)
+
+if _SERVE_SPA:
+    _assets_dir = os.path.join(_STATIC_DIR, "assets")
+    if os.path.isdir(_assets_dir):
+        # Hashed, immutable Vite assets.
+        app.mount("/assets", StaticFiles(directory=_assets_dir), name="assets")
+
+
+@app.get("/")
+def root():
+    if _SERVE_SPA:
+        return FileResponse(_STATIC_INDEX)
+    return {
+        "message": "Welcome to TutorConnect API",
+        "version": "0.2.0",
+        "docs": "/docs",
+    }
+
+
+if _SERVE_SPA:
+    # SPA catch-all: serve a real static file when one exists, otherwise return
+    # index.html so client-side routes (e.g. /dashboard) work on hard refresh.
+    # Registered LAST so it never shadows /api/*, /health, /docs, or /openapi.json
+    # (those routes are registered earlier and therefore match first).
+    @app.get("/{full_path:path}")
+    def spa_fallback(full_path: str):
+        # Never hijack the API surface: unknown API/docs paths get a real 404.
+        if full_path.startswith("api/") or full_path in ("health", "docs", "redoc", "openapi.json"):
+            return JSONResponse(status_code=404, content={"error": "Not Found"})
+        # Serve the requested file if it resolves to a real file inside the
+        # static dir (guards against path traversal); else fall back to the SPA.
+        candidate = os.path.normpath(os.path.join(_STATIC_DIR, full_path))
+        if candidate.startswith(_STATIC_DIR + os.sep) and os.path.isfile(candidate):
+            return FileResponse(candidate)
+        return FileResponse(_STATIC_INDEX)

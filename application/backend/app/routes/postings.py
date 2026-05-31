@@ -14,14 +14,18 @@ from datetime import datetime
 
 from app.db.database import get_db
 from app.db.models import Posting, User, Course
+from app.dependencies import get_current_user, get_current_admin
 
 router = APIRouter(prefix="/api/postings", tags=["postings"])
 
 
 # Request/Response models
 class PostingCreate(BaseModel):
-    """Posting creation request model."""
-    user_id: int
+    """Posting creation request model.
+
+    Note: the owner is derived from the authenticated user, NOT from the
+    request body, so user_id is intentionally absent here.
+    """
     course_id: Optional[int] = None  # Optional, will use default if not provided
     title: str
     description: str  # This is the bio from frontend
@@ -56,7 +60,8 @@ class PostingResponse(BaseModel):
     # Include user info
     user_name: Optional[str] = None
     user_email: Optional[str] = None
-    
+    profile_photo_url: Optional[str] = None
+
     class Config:
         orm_mode = True
 
@@ -64,7 +69,8 @@ class PostingResponse(BaseModel):
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_posting(
     posting_data: PostingCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> PostingResponse:
     """
     Create a new tutor posting.
@@ -82,17 +88,12 @@ def create_posting(
     **Returns:**
     - Posting object with status 'pending'
     """
-    # Verify user exists
-    user = db.query(User).filter(User.id == posting_data.user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
+    # Owner is the authenticated user (never trust a client-supplied user_id)
+    user = current_user
+
     # If course_id provided, verify it exists, otherwise use first course as default
     course_id = posting_data.course_id
-    if course_id:
+    if course_id is not None:
         course = db.query(Course).filter(Course.id == course_id).first()
         if not course:
             raise HTTPException(
@@ -112,7 +113,7 @@ def create_posting(
     # Build enhanced description with rate and subjects if provided
     description_parts = [posting_data.description]
     
-    if posting_data.rate:
+    if posting_data.rate is not None:
         description_parts.append(f"\n\n**Rate:** ${posting_data.rate}/hour")
     
     if posting_data.subjects:
@@ -129,7 +130,7 @@ def create_posting(
     
     # Create new posting
     new_posting = Posting(
-        user_id=posting_data.user_id,
+        user_id=current_user.id,
         course_id=course_id,
         title=posting_data.title,
         description=enhanced_description,
@@ -170,15 +171,22 @@ def get_postings(
             )
         query = query.filter(Posting.status == status_filter)
     
-    if user_id:
+    if user_id is not None:
         query = query.filter(Posting.user_id == user_id)
     
     postings = query.order_by(Posting.created_at.desc()).all()
+
+    # Batch-fetch the owning users in a single query to avoid an N+1 pattern.
+    user_ids = {p.user_id for p in postings}
+    users_by_id = {}
+    if user_ids:
+        for u in db.query(User).filter(User.id.in_(user_ids)).all():
+            users_by_id[u.id] = u
+
     result = []
     for p in postings:
         posting_dict = PostingResponse.from_orm(p).dict()
-        # Add user info
-        user = db.query(User).filter(User.id == p.user_id).first()
+        user = users_by_id.get(p.user_id)
         if user:
             posting_dict['user_name'] = f"{user.first_name} {user.last_name}"
             posting_dict['user_email'] = user.email
@@ -221,7 +229,8 @@ def update_posting_status(
     posting_id: int,
     new_status: str,
     rejection_reason: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin),
 ):
     """
     Update posting status (admin only).
@@ -233,8 +242,8 @@ def update_posting_status(
     - **new_status**: New status ('approved' or 'rejected')
     - **rejection_reason**: Optional rejection reason
     """
-    # TODO: Add admin authentication check
-    
+    # Admin authentication enforced via the get_current_admin dependency above.
+
     if new_status not in ['approved', 'rejected']:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

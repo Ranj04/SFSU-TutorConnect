@@ -31,20 +31,20 @@
 -- (Split command to avoid SQL parser issues with semicolons in comments)
 INSERT INTO users (email, password_hash, first_name, last_name, profile_photo_url, major, account_status)
 VALUES
-('admin@sfsu.edu', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqYq7qYq7q', 'Admin', 'One', NULL, NULL, 'active'),
-('tutor1@sfsu.edu', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqYq7qYq7q', 'Casey', 'Smith', 'https://example.com/photos/casey.jpg', 'Computer Science', 'active'),
-('tutor2@sfsu.edu', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqYq7qYq7q', 'Jordan', 'Lee', 'https://example.com/photos/jordan.jpg', 'Mathematics', 'active'),
-('tutor3@sfsu.edu', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqYq7qYq7q', 'Riley', 'Chen', 'https://example.com/photos/riley.jpg', 'Computer Science', 'active'),
-('tutor4@sfsu.edu', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqYq7qYq7q', 'Sam', 'Johnson', 'https://example.com/photos/sam.jpg', 'Physics', 'active'),
-('tutor5@sfsu.edu', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqYq7qYq7q', 'Dakota', 'Williams', 'https://example.com/photos/dakota.jpg', 'Chemistry', 'active'),
-('tutor6@sfsu.edu', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqYq7qYq7q', 'Morgan', 'Brown', 'https://example.com/photos/morgan.jpg', 'Biology', 'active'),
-('tutor7@sfsu.edu', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqYq7qYq7q', 'Avery', 'Martinez', 'https://example.com/photos/avery.jpg', 'Mathematics', 'active'),
-('tutor8@sfsu.edu', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqYq7qYq7q', 'Quinn', 'Garcia', 'https://example.com/photos/quinn.jpg', 'Physics', 'active'),
-('student1@sfsu.edu', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqYq7qYq7q', 'Alex', 'Student', 'https://example.com/photos/alex.jpg', 'Computer Science', 'active'),
-('student2@sfsu.edu', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqYq7qYq7q', 'Taylor', 'Student', 'https://example.com/photos/taylor.jpg', 'Business Administration', 'active'),
-('student3@sfsu.edu', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqYq7qYq7q', 'Morgan', 'Student', 'https://example.com/photos/morgan2.jpg', 'Computer Science', 'active'),
-('student4@sfsu.edu', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqYq7qYq7q', 'Jamie', 'Student', NULL, 'Biology', 'active'),
-('student5@sfsu.edu', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqYq7qYq7q', 'Avery', 'Student', NULL, 'Physics', 'active');
+('admin@sfsu.edu', '$2b$12$BB9vvz2DEU8rpDEM8zNwHuTgUq.JBARdREOmYsEFYQAD12hyh/eay', 'Admin', 'One', NULL, NULL, 'active'),
+('tutor1@sfsu.edu', '$2b$12$BB9vvz2DEU8rpDEM8zNwHuTgUq.JBARdREOmYsEFYQAD12hyh/eay', 'Casey', 'Smith', 'https://example.com/photos/casey.jpg', 'Computer Science', 'active'),
+('tutor2@sfsu.edu', '$2b$12$BB9vvz2DEU8rpDEM8zNwHuTgUq.JBARdREOmYsEFYQAD12hyh/eay', 'Jordan', 'Lee', 'https://example.com/photos/jordan.jpg', 'Mathematics', 'active'),
+('tutor3@sfsu.edu', '$2b$12$BB9vvz2DEU8rpDEM8zNwHuTgUq.JBARdREOmYsEFYQAD12hyh/eay', 'Riley', 'Chen', 'https://example.com/photos/riley.jpg', 'Computer Science', 'active'),
+('tutor4@sfsu.edu', '$2b$12$BB9vvz2DEU8rpDEM8zNwHuTgUq.JBARdREOmYsEFYQAD12hyh/eay', 'Sam', 'Johnson', 'https://example.com/photos/sam.jpg', 'Physics', 'active'),
+('tutor5@sfsu.edu', '$2b$12$BB9vvz2DEU8rpDEM8zNwHuTgUq.JBARdREOmYsEFYQAD12hyh/eay', 'Dakota', 'Williams', 'https://example.com/photos/dakota.jpg', 'Chemistry', 'active'),
+('tutor6@sfsu.edu', '$2b$12$BB9vvz2DEU8rpDEM8zNwHuTgUq.JBARdREOmYsEFYQAD12hyh/eay', 'Morgan', 'Brown', 'https://example.com/photos/morgan.jpg', 'Biology', 'active'),
+('tutor7@sfsu.edu', '$2b$12$BB9vvz2DEU8rpDEM8zNwHuTgUq.JBARdREOmYsEFYQAD12hyh/eay', 'Avery', 'Martinez', 'https://example.com/photos/avery.jpg', 'Mathematics', 'active'),
+('tutor8@sfsu.edu', '$2b$12$BB9vvz2DEU8rpDEM8zNwHuTgUq.JBARdREOmYsEFYQAD12hyh/eay', 'Quinn', 'Garcia', 'https://example.com/photos/quinn.jpg', 'Physics', 'active'),
+('student1@sfsu.edu', '$2b$12$BB9vvz2DEU8rpDEM8zNwHuTgUq.JBARdREOmYsEFYQAD12hyh/eay', 'Alex', 'Student', 'https://example.com/photos/alex.jpg', 'Computer Science', 'active'),
+('student2@sfsu.edu', '$2b$12$BB9vvz2DEU8rpDEM8zNwHuTgUq.JBARdREOmYsEFYQAD12hyh/eay', 'Taylor', 'Student', 'https://example.com/photos/taylor.jpg', 'Business Administration', 'active'),
+('student3@sfsu.edu', '$2b$12$BB9vvz2DEU8rpDEM8zNwHuTgUq.JBARdREOmYsEFYQAD12hyh/eay', 'Morgan', 'Student', 'https://example.com/photos/morgan2.jpg', 'Computer Science', 'active'),
+('student4@sfsu.edu', '$2b$12$BB9vvz2DEU8rpDEM8zNwHuTgUq.JBARdREOmYsEFYQAD12hyh/eay', 'Jamie', 'Student', NULL, 'Biology', 'active'),
+('student5@sfsu.edu', '$2b$12$BB9vvz2DEU8rpDEM8zNwHuTgUq.JBARdREOmYsEFYQAD12hyh/eay', 'Avery', 'Student', NULL, 'Physics', 'active');
 
 -- Tutor profiles (approved by admin)
 -- User profiles (formerly tutor profiles)

@@ -8,6 +8,7 @@ Contributors: Ranjiv Jithendran, Dhvanil Bhagat
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, EmailStr, validator
 from typing import Optional, Dict, Any
 from datetime import datetime
@@ -15,8 +16,30 @@ from datetime import datetime
 from app.db.database import get_db
 from app.db.models import User
 from app.services.auth import hash_password, verify_password
+from app.services.tokens import create_access_token
+from app.dependencies import get_current_user
+from app.services.ratelimit import RateLimiter
+
+# Throttle credential endpoints to blunt brute-force / enumeration. Keyed by
+# client IP + path; see app/services/ratelimit.py for limitations.
+login_limiter = RateLimiter(max_requests=10, window_seconds=60)
+register_limiter = RateLimiter(max_requests=5, window_seconds=60)
+
+
+def _require_self_or_admin(current_user: User, user_id: int) -> None:
+    """Authorize that the caller is acting on their own resource (or is admin)."""
+    if current_user.id != user_id and not getattr(current_user, "is_admin", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not allowed to modify this user's data",
+        )
+
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
+
+# Pre-computed hash used to keep login response timing constant when an email
+# does not exist, preventing user-enumeration via timing analysis.
+_DUMMY_PASSWORD_HASH = hash_password("invalid-password-placeholder")
 
 
 # Request/Response models
@@ -32,6 +55,10 @@ class UserRegistration(BaseModel):
     def validate_password(cls, v):
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters long')
+        # bcrypt only considers the first 72 bytes; reject longer inputs so a
+        # password is never silently truncated (a real correctness/security bug).
+        if len(v.encode('utf-8')) > 72:
+            raise ValueError('Password must be at most 72 bytes long')
         return v
     
     @validator('email')
@@ -56,7 +83,8 @@ class UserResponse(BaseModel):
     major: Optional[str]
     account_status: str
     profile_photo_url: Optional[str] = None
-    
+    is_admin: bool = False
+
     class Config:
         orm_mode = True
 
@@ -102,7 +130,11 @@ class ProfilePhotoUpdate(BaseModel):
         return v
 
 
-@router.post("/register", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(register_limiter)],
+)
 def register_user(
     user_data: UserRegistration,
     db: Session = Depends(get_db)
@@ -134,18 +166,20 @@ def register_user(
     """
     # Normalize email to lowercase for consistency
     normalized_email = user_data.email.lower()
-    
-    # Check if user already exists (case-insensitive)
+
+    # Pre-check for a friendly error, but rely on the DB UNIQUE(email) index as
+    # the source of truth: two concurrent registrations can both pass this check,
+    # so we also catch IntegrityError on commit (no unhandled 500 race).
     existing_user = db.query(User).filter(User.email == normalized_email).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
-    
+
     # Hash password
     password_hash = hash_password(user_data.password)
-    
+
     # Create new user with normalized email
     new_user = User(
         email=normalized_email,
@@ -155,18 +189,27 @@ def register_user(
         major=user_data.major,
         account_status='active'
     )
-    
+
     db.add(new_user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
     db.refresh(new_user)
-    
+
     return {
         "message": "User registered successfully",
-        "user": UserResponse.from_orm(new_user).dict()
+        "user": UserResponse.from_orm(new_user).dict(),
+        "access_token": create_access_token(new_user.id),
+        "token_type": "bearer",
     }
 
 
-@router.post("/login")
+@router.post("/login", dependencies=[Depends(login_limiter)])
 def login_user(
     login_data: UserLogin,
     db: Session = Depends(get_db)
@@ -195,8 +238,11 @@ def login_user(
     
     # Find user by email (case-insensitive)
     user = db.query(User).filter(User.email == normalized_email).first()
-    
+
     if not user:
+        # Run a dummy verification so the response takes a comparable amount of
+        # time whether or not the account exists (mitigates user enumeration).
+        verify_password(login_data.password, _DUMMY_PASSWORD_HASH)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
@@ -219,10 +265,12 @@ def login_user(
     # Update last login
     user.last_login = datetime.utcnow()
     db.commit()
-    
+
     return {
         "message": "Login successful",
-        "user": UserResponse.from_orm(user).dict()
+        "user": UserResponse.from_orm(user).dict(),
+        "access_token": create_access_token(user.id),
+        "token_type": "bearer",
     }
 
 
@@ -230,7 +278,8 @@ def login_user(
 def update_profile_photo(
     user_id: int,
     photo_data: ProfilePhotoUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
     Update a user's profile photo URL.
@@ -252,14 +301,16 @@ def update_profile_photo(
     }
     ```
     """
+    _require_self_or_admin(current_user, user_id)
+
     user = db.query(User).filter(User.id == user_id).first()
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
-    
+
     # Calculate image size for better error messages
     photo_size_bytes = len(photo_data.profile_photo_url)
     photo_size_mb = photo_size_bytes / (1024 * 1024)
@@ -378,7 +429,8 @@ def get_user_profile(
 def update_user_profile(
     user_id: int,
     profile_data: UserProfileUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
     Update user profile information (major, etc.).
@@ -392,14 +444,16 @@ def update_user_profile(
     **Returns:**
     - Updated user object
     """
+    _require_self_or_admin(current_user, user_id)
+
     user = db.query(User).filter(User.id == user_id).first()
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
-    
+
     # Update user fields
     if profile_data.major is not None:
         user.major = profile_data.major
@@ -417,7 +471,8 @@ def update_user_profile(
 def update_tutor_profile(
     user_id: int,
     tutor_data: TutorProfileUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
     Update or create tutor profile information.
@@ -435,14 +490,16 @@ def update_tutor_profile(
     - Updated tutor profile object
     """
     from app.db.models import TutorProfile
-    
+
+    _require_self_or_admin(current_user, user_id)
+
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
-    
+
     # Get or create tutor profile
     tutor_profile = db.query(TutorProfile).filter(TutorProfile.user_id == user_id).first()
     

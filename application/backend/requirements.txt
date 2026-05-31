@@ -1,22 +1,29 @@
 # Backend Production Dependencies
-# Only packages needed to run the application
+# Only packages needed to run the application.
+#
+# NOTE: Versions were updated to patched releases that address known
+# Starlette/FastAPI/gunicorn advisories while remaining on the Pydantic v1 API
+# the codebase uses (@validator, orm_mode, .dict(), from_orm). Migrating to
+# Pydantic v2 is a separate, larger change. After changing this file run:
+#   pip install -r requirements.txt   &&   the test suite.
 
 # Web Framework
-fastapi==0.104.1
-pydantic==1.10.13
-uvicorn==0.24.0
-gunicorn==21.2.0
+fastapi==0.110.3          # supports Pydantic v1 and v2; pulls patched Starlette
+pydantic==1.10.18         # latest 1.x (EOL line; pinned intentionally — see note)
+starlette==0.37.2         # pinned explicitly; addresses multipart/body DoS advisories
+uvicorn==0.30.6
+gunicorn==22.0.0          # CVE-2024-1135 (request smuggling) fixed in 22.x
 
 # Database
-sqlalchemy==2.0.23
+sqlalchemy==2.0.36
 alembic==1.13.3
 mysql-connector-python==8.4.0
-pymysql==1.1.0
-cryptography>=41.0.0  # Required for MySQL 8.0 authentication (caching_sha2_password)
+pymysql==1.1.1            # patched
+cryptography>=42.0.0      # Required for MySQL 8.0 caching_sha2_password auth
 
 # Configuration
-python-dotenv==1.0.0
+python-dotenv==1.0.1
 
 # Password Hashing
-bcrypt==4.1.2
-email-validator==2.1.1
+bcrypt==4.2.0
+email-validator==2.2.0

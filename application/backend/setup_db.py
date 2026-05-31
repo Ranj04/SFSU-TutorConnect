@@ -7,9 +7,9 @@ SQL migrations, and seeds initial data. Can be run locally or in CI/CD.
 
 Contributors: Ranjiv Jithendran, Dhvanil Bhagat
 
-Defaults come from credentials/README.md:
+Defaults (non-secret) :
   user: app_user
-  password: team02db
+  password: (none — supply via DB_PASSWORD env var, DATABASE_URL, or the prompt)
   host: 127.0.0.1
   port: 3306
   database: csc648_tutoring_platform
@@ -30,11 +30,13 @@ MIGRATIONS_DIR = ROOT / "db" / "migrations"
 SEED_DIR = ROOT / "db" / "seed"
 ENV_PATH = ROOT / ".env"
 
+# No hardcoded password default: supply it interactively or via the
+# DB_PASSWORD / DATABASE_URL environment variables (never committed to the repo).
 DEFAULTS = {
     "DB_HOST": "127.0.0.1",
     "DB_PORT": "3306",
     "DB_USER": "app_user",
-    "DB_PASSWORD": "team02db",
+    "DB_PASSWORD": "",
     "DB_NAME": "csc648_tutoring_platform",
 }
 
