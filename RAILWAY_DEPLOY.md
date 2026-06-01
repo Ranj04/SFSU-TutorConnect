@@ -53,6 +53,12 @@ dashboard.
    expected; we fix it next.
 3. In the same project: **New** → **Database** → **Add MySQL**.
 
+> **Auto-deploy:** once the repo is connected, Railway **redeploys automatically
+> on every push to `main`** (building the `Dockerfile`). There is no GitHub Actions
+> deploy workflow and no deploy secret stored in GitHub — Railway owns deployment,
+> so to deploy you just `git push origin main`. Rollbacks and build/deploy logs
+> live in the Railway dashboard. (The old AWS SSH deploy workflows were removed.)
+
 ## STEP 2 — Wire the database to the app
 
 1. Open the **app service** → **Variables** tab.
@@ -163,6 +169,15 @@ UPDATE users SET is_admin = 1 WHERE email = 'you@sfsu.edu';
   present (combined deploy) and falls back to JSON when absent (API-only local
   dev). The SPA catch-all never shadows `/api/*`, `/health`, or `/docs`.
 - **`application/backend/app/config.py`** — normalizes `mysql://` → `mysql+pymysql://`.
+
+## CI/CD
+
+- **Deploy:** Railway's native GitHub integration auto-deploys on push to `main`.
+  There is **no** deploy workflow in `.github/workflows/`; the former AWS workflows
+  (`production-deploy.yml`, `staging-deploy.yml`) were removed when the app moved
+  off EC2.
+- **CI:** `.github/workflows/ci.yml` still runs on pull requests and pushes
+  (backend flake8 + compile, frontend ESLint + build). It does not deploy.
 
 ## Troubleshooting
 
